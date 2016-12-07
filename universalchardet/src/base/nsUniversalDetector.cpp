@@ -117,7 +117,7 @@ nsresult nsUniversalDetector::HandleData(const char* aBuf, PRUint32 aLen)
         case '\xEF':
           if (('\xBB' == aBuf[1]) && ('\xBF' == aBuf[2]))
             // EF BB BF  UTF-8 encoded BOM
-            mDetectedCharset = "UTF-8";
+            mDetectedCharset = "UTF-8 BOM";
         break;
         case '\xFE':
           if (('\xFF' == aBuf[1]) && ('\x00' == aBuf[2]) && ('\x00' == aBuf[3]))

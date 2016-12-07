@@ -12,7 +12,7 @@ QString CharsetDetector::detectData(const QByteArray &data)
     this->HandleData(data.data(),data.size());
     this->DataEnd();
     if(m_charset.isEmpty()){
-        m_charset = "UTF-8"; //"unknow";
+        m_charset = "unknow"; //"UTF-8"; //
     }
     return m_charset;
 }
