@@ -5,6 +5,8 @@
 #include <QStringList>
 #include <QStandardItemModel>
 #include <QTableView>
+#include <QHeaderView>
+
 #include <QPushButton>
 #include <QFileDialog>
 #include <QVBoxLayout>
@@ -57,13 +59,26 @@ void Widget::fileSelectSlot()
         QString encode = det.detectData(filedata);
         QList<QStandardItem*> items;
         items.append(new QStandardItem(QDir(filename).dirName()));
-        //items[0]->setTextAlignment(Qt::AlignRight);
-        items.append(new QStandardItem(QString().setNum(filesize)));
+        QString sfilesize;
+        if(filesize < 1024){
+            sfilesize.setNum(filesize).append(" B");
+        }else if(filesize < 1024*1024){
+            sfilesize.setNum(filesize/1024).append(" K");
+        }else if(filesize < 1024*1024*1024){
+            sfilesize.setNum(filesize/1024/1024).append(" M");
+        }else if(filesize < 1024*1024*1024*1024){
+            sfilesize.setNum(filesize/1024/1024/1024).append(" G");
+        }
+        items.append(new QStandardItem(sfilesize));
+        items[1]->setTextAlignment(Qt::AlignRight);
+
         items.append(new QStandardItem(encode));
         items.append(new QStandardItem(encode));
         ui_fileModel->appendRow(items);
     }
 
+    // 根据内容调整列宽
+    //ui_fileTable->resizeColumnsToContents();
 }
 
 void Widget::initFileTable()
@@ -81,6 +96,10 @@ void Widget::initFileTable()
     }
     ui_fileTable = new QTableView;
     ui_fileTable->setModel(ui_fileModel);
+    ui_fileTable->setItemDelegateForColumn(2,new ComboxDelegate());
     ui_fileTable->setItemDelegateForColumn(3,new ComboxDelegate());
-    //ui_fileTable->setCo
+    //ui_fileTable->setH
+    //设置充满表宽度(现有列占据整个表格)
+    ui_fileTable->horizontalHeader()->setStretchLastSection(true);
+    ui_fileTable->setColumnWidth(0,this->width() - 256);
 }
