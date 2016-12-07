@@ -4,12 +4,14 @@
 #include <QStyledItemDelegate>
 
 class ComboxDelegate:public QStyledItemDelegate{
+    bool m_out_mode;
 public:
+    ComboxDelegate(bool out = false)
+        :m_out_mode(out){}
+
     // 创建你编辑时候的控件
     // 返回一个组件。该组件会被作为用户编辑数据时所使用的编辑器，从模型中接受数据，返回用户修改的数据。
-    QWidget* createEditor(QWidget *parent,
-                          const QStyleOptionViewItem &option,
-                          const QModelIndex &index) const;
+    QWidget* createEditor(QWidget *parent, const QStyleOptionViewItem &, const QModelIndex &) const;
 
     // 编辑的时候设置数据到上面创建的editor中。
     // 提供上述组件在显示时所需要的默认值。
@@ -24,8 +26,7 @@ public:
     // 设置编辑控件的位置和大小、样式等
     // 返回给模型用户修改过的数据
     void updateEditorGeometry(QWidget * editor,
-                              const QStyleOptionViewItem & option,
-                              const QModelIndex & index );
+                              const QStyleOptionViewItem & option, const QModelIndex &);
 };
 
 #endif // COMBOXDELEGATE_HPP

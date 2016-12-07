@@ -3,13 +3,14 @@
 #include <QComboBox>
 
 QWidget *ComboxDelegate::createEditor(QWidget *parent,
-                                      const QStyleOptionViewItem &option,
-                                      const QModelIndex &index) const
+                                      const QStyleOptionViewItem&,
+                                      const QModelIndex&) const
 {
 
     QComboBox* ui_encoding = new QComboBox(parent);
     // International (Unicode)
     ui_encoding->addItem("UTF-8");
+    ui_encoding->addItem("UTF-8 BOM");
     ui_encoding->addItem("UTF-16BE");
     ui_encoding->addItem("UTF-16LE");
     ui_encoding->addItem("UTF-32BE");
@@ -20,6 +21,9 @@ QWidget *ComboxDelegate::createEditor(QWidget *parent,
     ui_encoding->addItem("EUC-TW");
     ui_encoding->addItem("GB18030");
     ui_encoding->addItem("HZ-GB-2312");
+    if(m_out_mode){
+        return ui_encoding;
+    }
     // English
     ui_encoding->addItem("ASCII");
     // Esperanto
@@ -59,7 +63,7 @@ void ComboxDelegate::setModelData(QWidget *editor,
 
 void ComboxDelegate::updateEditorGeometry(QWidget *editor,
                                           const QStyleOptionViewItem &option,
-                                          const QModelIndex &index)
+                                          const QModelIndex&)
 {
     editor->setGeometry(option.rect);
 }
