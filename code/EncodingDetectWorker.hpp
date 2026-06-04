@@ -10,6 +10,9 @@ struct FileEncodingResult {
     QString encoding;
     qint64  fileSize;
 };
+Q_DECLARE_METATYPE(FileEncodingResult)
+
+
 
 class EncodingDetectWorker : public QObject, public QRunnable
 {
@@ -28,5 +31,6 @@ signals:
 private:
     QString m_filePath;
 };
+
 
 #endif   // ENCODINGDETECTWORKER_HPP

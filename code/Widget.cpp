@@ -28,6 +28,7 @@
 #include <QListWidget>
 #include <QHBoxLayout>
 #include <QMessageBox>
+#include <QApplication>
 #include <QVector>
 #include <QPair>
 #include <QSet>
@@ -54,9 +55,12 @@ Widget::Widget(QWidget* parent)
 {
     this->setWindowTitle(tr("Batch Charset Encoding Convert"));
 
+    // 注册FileEncodingResult到元类型系统
+    qRegisterMetaType<FileEncodingResult>("FileEncodingResult");
+
     // 初始化线程池
     m_threadPool = new QThreadPool(this);
-    m_threadPool->setMaxThreadCount(QThread::idealThreadCount());
+    m_threadPool->setMaxThreadCount(qMin(4, QThread::idealThreadCount()));
 
     // 初始化文件表
     initFileTable();
@@ -638,18 +642,23 @@ void Widget::onFileConvertProgress(int successCount, int failCount, const QStrin
     if (m_progressDialog) {
         updateProgressDialog(m_conversionSuccessCount + m_conversionFailCount, m_totalFilesToProcess, tr("Converting: %1").arg(currentFile));
     }
+
+    // 检查是否所有文件都已处理完成
+    if (m_conversionSuccessCount + m_conversionFailCount >= m_totalFilesToProcess) {
+        hideProgressDialog();
+
+        QString message = tr("Conversion completed:\n");
+        message += tr("Success: %1 file(s)\n").arg(m_conversionSuccessCount);
+        message += tr("Failed: %1 file(s)").arg(m_conversionFailCount);
+
+        QMessageBox::information(this, tr("Conversion Result"), message);
+        m_cancelFlag.store(0);
+    }
 }
 
 void Widget::onFileConvertCompleted(int successCount, int failCount)
 {
-    hideProgressDialog();
-
-    QString message = tr("Conversion completed:\n");
-    message += tr("Success: %1 file(s)\n").arg(m_conversionSuccessCount);
-    message += tr("Failed: %1 file(s)").arg(m_conversionFailCount);
-
-    QMessageBox::information(this, tr("Conversion Result"), message);
-    m_cancelFlag.store(0);
+    // 不再使用此信号，改用onFileConvertProgress中的计数器判断完成
 }
 
 void Widget::onFileConvertError(const QString& filePath, const QString& error)
@@ -671,11 +680,12 @@ void Widget::showProgressDialog(const QString& title)
         m_progressDialog->setWindowModality(Qt::WindowModal);
         m_progressDialog->setCancelButtonText(tr("Cancel"));
         m_progressDialog->setMinimumDuration(0);
-        m_progressDialog->setRange(0, 0);
+        m_progressDialog->setRange(0, 0);  // 初始设置为无限模式
         connect(m_progressDialog, &QProgressDialog::canceled, this, &Widget::onProgressDialogCanceled);
     }
 
     m_progressDialog->setWindowTitle(title);
+    m_progressDialog->setValue(0);  // 重置进度值
     m_progressDialog->show();
 }
 
@@ -727,8 +737,18 @@ void Widget::startEncodingDetection(const QStringList& files)
     resetProgressDialog();
     m_totalFilesToProcess = files.size();
     m_processedFiles = 0;
+
+    // 先显示进度对话框
     showProgressDialog(tr("Detecting Encodings"));
-    updateProgressDialog(0, m_totalFilesToProcess, tr("Starting detection..."));
+
+    // 立即设置进度范围和初始值
+    if (m_progressDialog) {
+        m_progressDialog->setRange(0, m_totalFilesToProcess);
+        m_progressDialog->setValue(0);
+        m_progressDialog->setLabelText(tr("Starting detection..."));
+        // 强制刷新UI
+        QApplication::processEvents();
+    }
 
     // 启动多个EncodingDetectWorker并行处理
     for (const QString& filePath : files) {
@@ -744,6 +764,7 @@ void Widget::startFileConversion()
     // 统计需要转换的文件
     QList<QPair<int, QString>> filesToConvert;
     int totalFiles = 0;
+    int skippedFiles = 0;  // 未知编码文件数量
 
     for (int row = 0; row < ui_fileModel->rowCount(); ++row) {
         QString fromEncoding = ui_fileModel->item(row, 2)->text();
@@ -754,8 +775,19 @@ void Widget::startFileConversion()
             continue;
         }
 
+        // 处理未知编码
+        if (fromEncoding == "unknow" || fromEncoding.isEmpty()) {
+            skippedFiles++;
+            continue;
+        }
+
         filesToConvert.append(qMakePair(row, filePath));
         totalFiles++;
+    }
+
+    if (totalFiles == 0 && skippedFiles > 0) {
+        QMessageBox::information(this, tr("Info"), tr("All files have unknown encoding. Please select encoding manually."));
+        return;
     }
 
     if (totalFiles == 0) {
@@ -774,11 +806,21 @@ void Widget::startFileConversion()
 
     // 重置进度并开始转换
     resetProgressDialog();
-    m_totalFilesToProcess = totalFiles;
+    m_totalFilesToProcess = totalFiles;  // 设置为实际需要处理的文件数
     m_conversionSuccessCount = 0;
     m_conversionFailCount = 0;
+
+    // 先显示进度对话框
     showProgressDialog(tr("Converting Files"));
-    updateProgressDialog(0, m_totalFilesToProcess, tr("Starting conversion..."));
+
+    // 立即设置进度范围和初始值
+    if (m_progressDialog) {
+        m_progressDialog->setRange(0, m_totalFilesToProcess);
+        m_progressDialog->setValue(0);
+        m_progressDialog->setLabelText(tr("Starting conversion..."));
+        // 强制刷新UI
+        QApplication::processEvents();
+    }
 
     // 启动多个FileConvertWorker并行处理
     for (const auto& filePair : filesToConvert) {
@@ -787,25 +829,10 @@ void Widget::startFileConversion()
         QString fromEncoding = ui_fileModel->item(row, 2)->text();
         QString toEncoding = ui_fileModel->item(row, 3)->text();
 
-        // 处理未知编码 - 由于这是并行处理，需要特殊处理
-        if (fromEncoding == "unknow" || fromEncoding.isEmpty()) {
-            // 未知编码在并行模式下暂时跳过
-            qDebug() << "Skipping file with unknown encoding:" << filePath;
-            m_conversionFailCount++;
-            continue;
-        }
-
         FileConvertWorker* worker = new FileConvertWorker(filePath, fromEncoding, toEncoding, needBackup, &m_cancelFlag);
         connect(worker, &FileConvertWorker::progressUpdated, this, &Widget::onFileConvertProgress);
-        connect(worker, &FileConvertWorker::conversionCompleted, this, &Widget::onFileConvertCompleted);
+        // 不再连接conversionCompleted信号，改用progressUpdated中的计数器判断完成
         connect(worker, &FileConvertWorker::conversionError, this, &Widget::onFileConvertError);
         m_threadPool->start(worker);
-    }
-
-    // 如果所有文件都被跳过（都是未知编码），显示结果
-    if (m_conversionFailCount > 0 && m_conversionFailCount == totalFiles) {
-        hideProgressDialog();
-        QMessageBox::information(this, tr("Info"), tr("All files have unknown encoding. Please select encoding manually."));
-        m_cancelFlag.store(0);
     }
 }
