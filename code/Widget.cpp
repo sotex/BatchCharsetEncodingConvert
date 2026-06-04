@@ -369,7 +369,8 @@ void Widget::onSetUniformOutEncode()
     QComboBox* comboBox = new QComboBox(&dialog);
 
     // 添加常用编码
-    QStringList encodings = {"UTF-8", "GBK", "GB18030", "GB2312", "Big5", "ISO-8859-1", "Shift_JIS"};
+    QStringList encodings = {"UTF-8", "UTF-8 BOM", "UTF-16BE", "UTF-16LE", "UTF-32BE", "UTF-32LE", "ISO-2022-CN",
+                             "BIG5", "EUC-TW", "GB18030", "HZ-GB-2312"};
     comboBox->addItems(encodings);
 
     QHBoxLayout* btnLayout = new QHBoxLayout;
