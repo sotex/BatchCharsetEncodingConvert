@@ -1,6 +1,7 @@
 #ifndef WIDGET_H
 #define WIDGET_H
 
+#include <QDir>
 #include <QWidget>
 
 class QTableView;
@@ -23,6 +24,7 @@ public slots:
 private:
     void addToFileModel(QStringList filenames);
     void initFileTable();
+    void scanFilesRecursively(QDir dir, const QStringList& extensions, QStringList& fileList);
 
 private:
     QTableView*         ui_fileTable;
