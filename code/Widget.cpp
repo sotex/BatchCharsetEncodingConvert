@@ -15,6 +15,7 @@
 #include <QLabel>
 #include <QAction>
 #include <QCheckBox>
+#include <set>
 
 #include <QDebug>
 #include <QDir>
@@ -448,7 +449,7 @@ void Widget::onRemoveSelected()
     QModelIndexList selectedIndexes = ui_fileTable->selectionModel()->selectedIndexes();
 
     // 从后往前删除，避免索引变化
-    QSet<int> rows;
+    std::set<int> rows;
     for (const QModelIndex& index : selectedIndexes) {
         rows.insert(index.row());
     }
