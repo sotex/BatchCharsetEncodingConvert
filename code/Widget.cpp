@@ -252,7 +252,7 @@ void Widget::addToFileModel(QStringList filenames)
 void Widget::initFileTable()
 {
     ui_fileModel            = new QStandardItemModel;
-    QStringList tableheader = {tr("File Name"), tr("Size"), tr("Encode"), tr("Out Encode")};
+    QStringList tableheader = {tr("File Name"), tr("Size"), tr("Encode"), tr("Out Encode"), tr("Full Path")};
     for (int i = 0; i < tableheader.size(); ++i) {
         QStandardItem* item = new QStandardItem(tableheader[i]);
         ui_fileModel->setHorizontalHeaderItem(i, item);
