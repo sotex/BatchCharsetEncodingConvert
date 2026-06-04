@@ -17,6 +17,19 @@ QString CharsetDetector::detectData(const QByteArray &data)
     return m_charset;
 }
 
+QString CharsetDetector::detectFile(QFile &file)
+{
+    qint64     filesize = file.size();
+    QByteArray filedata;
+    if (filesize < 1024 * 1024) {
+        filedata = file.readAll();
+    }
+    else {
+        filedata = file.read(1024 * 1024);
+    }
+    return detectData(filedata);
+}
+
 void CharsetDetector::Report(const char *aCharset)
 {
     m_charset = aCharset;

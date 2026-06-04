@@ -4,6 +4,7 @@
 #include "nscore.h"
 #include "nsUniversalDetector.h"
 
+#include <QFile>
 #include <QString>
 
 
@@ -13,6 +14,9 @@ public:
     CharsetDetector(PRUint32 aLanguageFilter = NS_FILTER_ALL);
 
     QString detectData(const QByteArray& data);
+
+    QString detectFile(QFile &file);
+
 protected:
     virtual void Report(const char* aCharset);
     QString m_charset;

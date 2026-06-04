@@ -37,6 +37,9 @@ private:
     void addToFileModel(QStringList filenames);
     void initFileTable();
     void scanFilesRecursively(QDir dir, const QStringList& extensions, QStringList& fileList);
+    QString selectUnknownEncodingDialog(const QString& fileName, bool& applyToAll);
+    bool convertFile(const QString& filePath, const QString& fromEncoding, const QString& toEncoding, bool createBackup);
+    bool backupFile(const QString& filePath);
 
 private:
     QTableView*         ui_fileTable;
@@ -46,6 +49,8 @@ private:
     QPushButton*        ui_ConvertTo;
     QPushButton*        ui_Exit;
     QMenu*              m_contextMenu;
+    QString             m_unknownEncoding;  // 全局未知编码设置
+    bool                m_applyToAllUnknown;  // 是否应用到全部未知编码文件
 };
 
 #endif   // WIDGET_H

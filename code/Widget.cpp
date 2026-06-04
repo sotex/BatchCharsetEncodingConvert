@@ -11,11 +11,14 @@
 #include <QComboBox>
 #include <QLabel>
 #include <QAction>
+#include <QCheckBox>
 
 #include <QDebug>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QFileDialog>
+#include <QTextStream>
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QDialog>
@@ -24,6 +27,7 @@
 #include <QMessageBox>
 #include <QVector>
 #include <QPair>
+#include <QSet>
 #include <QDesktopServices>
 #include <QUrl>
 #include <QProcess>
@@ -36,6 +40,7 @@ Widget::Widget(QWidget* parent)
     , ui_fileTable(nullptr)
     , ui_fileModel(nullptr)
     , m_contextMenu(nullptr)
+    , m_applyToAllUnknown(false)
 {
     this->setWindowTitle(tr("Batch Charset Encoding Convert"));
     // 初始化文件表
@@ -201,7 +206,106 @@ void Widget::dirSelectSlot()
     addToFileModel(fullPaths);
 }
 
-void Widget::convertToSlot() {}
+void Widget::convertToSlot()
+{
+    // 重置全局设置
+    m_unknownEncoding.clear();
+    m_applyToAllUnknown = false;
+
+    // 统计需要转换的文件
+    QList<QPair<int, QString>> filesToConvert;  // <行号, 文件路径>
+    int totalFiles = 0;
+
+    for (int row = 0; row < ui_fileModel->rowCount(); ++row) {
+        QString fromEncoding = ui_fileModel->item(row, 2)->text();
+        QString toEncoding = ui_fileModel->item(row, 3)->text();
+        QString filePath = ui_fileModel->item(row, COL_FULLPATH)->text();
+
+        // 跳过输入输出编码一致的文件
+        if (fromEncoding == toEncoding) {
+            continue;
+        }
+
+        filesToConvert.append(qMakePair(row, filePath));
+        totalFiles++;
+    }
+
+    if (totalFiles == 0) {
+        QMessageBox::information(this, tr("Info"), tr("No files need to be converted."));
+        return;
+    }
+
+    // 询问是否备份
+    QMessageBox::StandardButton reply;
+    reply = QMessageBox::question(this, tr("Backup"),
+                                 tr("Found %1 file(s) to convert.\nDo you want to create backup files (.bak) before conversion?")
+                                 .arg(totalFiles),
+                                 QMessageBox::Yes | QMessageBox::No);
+
+    bool needBackup = (reply == QMessageBox::Yes);
+
+    // 开始转换
+    int successCount = 0;
+    int skipCount = 0;
+    int failCount = 0;
+
+    for (const auto& filePair : filesToConvert) {
+        int row = filePair.first;
+        QString filePath = filePair.second;
+        QString fromEncoding = ui_fileModel->item(row, 2)->text();
+        QString toEncoding = ui_fileModel->item(row, 3)->text();
+
+        // 处理未知编码
+        if (fromEncoding == "Unknown" || fromEncoding.isEmpty()) {
+            if (m_applyToAllUnknown && !m_unknownEncoding.isEmpty()) {
+                fromEncoding = m_unknownEncoding;
+            }
+            else {
+                bool applyToAll = false;
+                QString selectedEncoding = selectUnknownEncodingDialog(QFileInfo(filePath).fileName(), applyToAll);
+                if (selectedEncoding.isEmpty()) {
+                    // 用户取消了该文件
+                    skipCount++;
+                    continue;
+                }
+
+                fromEncoding = selectedEncoding;
+
+                if (applyToAll) {
+                    m_unknownEncoding = selectedEncoding;
+                    m_applyToAllUnknown = true;
+                }
+            }
+        }
+
+        // 备份文件
+        if (needBackup) {
+            if (!backupFile(filePath)) {
+                qDebug() << "Backup failed for file: " << filePath;
+                failCount++;
+                continue;
+            }
+        }
+
+        // 转换文件
+        if (convertFile(filePath, fromEncoding, toEncoding, needBackup)) {
+            // 更新表格中的编码
+            ui_fileModel->item(row, 2)->setText(toEncoding);
+            successCount++;
+        }
+        else {
+            failCount++;
+        }
+    }
+
+    // 显示结果
+    QString message = tr("Conversion completed:\n");
+    message += tr("Success: %1 file(s)\n").arg(successCount);
+    message += tr("Skipped: %1 file(s)\n").arg(skipCount);
+    message += tr("Failed: %1 file(s)").arg(failCount);
+
+    QMessageBox::information(this, tr("Conversion Result"), message);
+}
 
 void Widget::addToFileModel(QStringList filenames)
 {
@@ -213,14 +317,7 @@ void Widget::addToFileModel(QStringList filenames)
             continue;
         }
         qint64     filesize = file.size();
-        QByteArray filedata;
-        if (filesize < 1024 * 1024) {
-            filedata = file.readAll();
-        }
-        else {
-            filedata = file.read(1024 * 1024);
-        }
-        QString               encode = det.detectData(filedata);
+        QString               encode = det.detectFile(file);
         QList<QStandardItem*> items;
         items.append(new QStandardItem(QFileInfo(filename).fileName()));
         QString sfilesize;
@@ -252,7 +349,7 @@ void Widget::addToFileModel(QStringList filenames)
 void Widget::initFileTable()
 {
     ui_fileModel            = new QStandardItemModel;
-    QStringList tableheader = {tr("File Name"), tr("Size"), tr("Encode"), tr("Out Encode"), tr("Full Path")};
+    QStringList tableheader = {tr("File Name"), tr("Size"), tr("Encode"), tr("Out Encode")};
     for (int i = 0; i < tableheader.size(); ++i) {
         QStandardItem* item = new QStandardItem(tableheader[i]);
         ui_fileModel->setHorizontalHeaderItem(i, item);
@@ -403,12 +500,7 @@ void Widget::onSetUniformOutEncode()
 
 void Widget::onOpenFileLocation()
 {
-    QModelIndexList selectedIndexes = ui_fileTable->selectionModel()->selectedRows();
-    if (selectedIndexes.isEmpty()) {
-        return;
-    }
-
-    QModelIndex index = selectedIndexes.first();
+    QModelIndex index = ui_fileTable->selectionModel()->currentIndex();
     QStandardItem* fullPathItem = ui_fileModel->item(index.row(), COL_FULLPATH);
     if (!fullPathItem) {
         return;
@@ -425,12 +517,7 @@ void Widget::onOpenFileLocation()
 
 void Widget::onOpenWithNotepad()
 {
-    QModelIndexList selectedIndexes = ui_fileTable->selectionModel()->selectedRows();
-    if (selectedIndexes.isEmpty()) {
-        return;
-    }
-
-    QModelIndex index = selectedIndexes.first();
+    QModelIndex index = ui_fileTable->selectionModel()->currentIndex();
     QStandardItem* fullPathItem = ui_fileModel->item(index.row(), COL_FULLPATH);
     if (!fullPathItem) {
         return;
@@ -454,4 +541,87 @@ void Widget::onRemoveSelected()
     for (auto it = rows.rbegin(); it != rows.rend(); it++) {
         ui_fileModel->removeRow(*it);
     }
+}
+
+QString Widget::selectUnknownEncodingDialog(const QString& fileName, bool& applyToAll)
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("Select Encoding"));
+    dialog.setMinimumSize(350, 180);
+
+    QVBoxLayout* layout = new QVBoxLayout(&dialog);
+
+    QLabel* label = new QLabel(tr("File '%1' has unknown encoding.\nPlease select the encoding:").arg(fileName), &dialog);
+    QComboBox* comboBox = new QComboBox(&dialog);
+
+    // 添加常用编码
+    QStringList encodings = {"UTF-8", "GBK", "GB18030", "GB2312", "Big5", "ISO-8859-1", "Shift_JIS", "EUC-KR", "EUC-JP"};
+    comboBox->addItems(encodings);
+
+    QCheckBox* applyToAllCheckBox = new QCheckBox(tr("Apply to all unknown encoding files"), &dialog);
+
+    QHBoxLayout* btnLayout = new QHBoxLayout;
+    QPushButton* okBtn = new QPushButton(tr("OK"), &dialog);
+    QPushButton* cancelBtn = new QPushButton(tr("Skip"), &dialog);
+
+    btnLayout->addStretch();
+    btnLayout->addWidget(okBtn);
+    btnLayout->addWidget(cancelBtn);
+
+    layout->addWidget(label);
+    layout->addWidget(comboBox);
+    layout->addWidget(applyToAllCheckBox);
+    layout->addLayout(btnLayout);
+
+    connect(okBtn, &QPushButton::clicked, &dialog, &QDialog::accept);
+    connect(cancelBtn, &QPushButton::clicked, &dialog, &QDialog::reject);
+
+    if (dialog.exec() == QDialog::Accepted) {
+        applyToAll = applyToAllCheckBox->isChecked();
+        return comboBox->currentText();
+    }
+
+    return QString();
+}
+
+bool Widget::backupFile(const QString& filePath)
+{
+    QFileInfo fileInfo(filePath);
+    QString backupPath = filePath + ".bak";
+
+    // 检查备份文件是否已存在
+    if (QFile::exists(backupPath)) {
+        // 删除旧的备份文件
+        QFile::remove(backupPath);
+    }
+
+    return QFile::copy(filePath, backupPath);
+}
+
+bool Widget::convertFile(const QString& filePath, const QString& fromEncoding, const QString& toEncoding, bool createBackup)
+{
+    QFile file(filePath);
+    if (!file.open(QFile::ReadOnly | QFile::Text)) {
+        qDebug() << "Cannot open file for reading:" << filePath;
+        return false;
+    }
+
+    // 读取文件内容
+    QTextStream in(&file);
+    in.setCodec(fromEncoding.toLatin1().constData());
+    QString content = in.readAll();
+    file.close();
+
+    // 写入转换后的内容
+    if (!file.open(QFile::WriteOnly | QFile::Text | QFile::Truncate)) {
+        qDebug() << "Cannot open file for writing:" << filePath;
+        return false;
+    }
+
+    QTextStream out(&file);
+    out.setCodec(toEncoding.toLatin1().constData());
+    out << content;
+    file.close();
+
+    return true;
 }
