@@ -7,10 +7,14 @@
 class QTableView;
 class QStandardItemModel;
 class QPushButton;
+class QMenu;
 
 class Widget : public QWidget
 {
     Q_OBJECT
+
+public:
+    static const int COL_FULLPATH = 4;  // 隐藏的完整路径列
 
 public:
     Widget(QWidget* parent = 0);
@@ -20,6 +24,14 @@ public slots:
     void fileSelectSlot();
     void dirSelectSlot();
     void convertToSlot();
+
+private slots:
+    void onHeaderContextMenu(const QPoint& pos);
+    void onTableContextMenu(const QPoint& pos);
+    void onSetUniformOutEncode();
+    void onOpenFileLocation();
+    void onOpenWithNotepad();
+    void onRemoveSelected();
 
 private:
     void addToFileModel(QStringList filenames);
@@ -33,6 +45,7 @@ private:
     QPushButton*        ui_dirSelect;
     QPushButton*        ui_ConvertTo;
     QPushButton*        ui_Exit;
+    QMenu*              m_contextMenu;
 };
 
 #endif   // WIDGET_H

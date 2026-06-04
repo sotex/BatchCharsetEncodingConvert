@@ -7,6 +7,10 @@
 #include <QStringList>
 #include <QTableView>
 #include <QAbstractItemView>
+#include <QMenu>
+#include <QComboBox>
+#include <QLabel>
+#include <QAction>
 
 #include <QDebug>
 #include <QDir>
@@ -20,12 +24,18 @@
 #include <QMessageBox>
 #include <QVector>
 #include <QPair>
+#include <QDesktopServices>
+#include <QUrl>
+#include <QProcess>
+#include <QModelIndexList>
+#include <algorithm>
 
 
 Widget::Widget(QWidget* parent)
     : QWidget(parent)
     , ui_fileTable(nullptr)
     , ui_fileModel(nullptr)
+    , m_contextMenu(nullptr)
 {
     this->setWindowTitle(tr("Batch Charset Encoding Convert"));
     // 初始化文件表
@@ -212,7 +222,7 @@ void Widget::addToFileModel(QStringList filenames)
         }
         QString               encode = det.detectData(filedata);
         QList<QStandardItem*> items;
-        items.append(new QStandardItem(QDir(filename).dirName()));
+        items.append(new QStandardItem(QFileInfo(filename).fileName()));
         QString sfilesize;
         if (filesize < 1024) {
             sfilesize.setNum(filesize).append(" B");
@@ -231,6 +241,10 @@ void Widget::addToFileModel(QStringList filenames)
 
         items.append(new QStandardItem(encode));
         items.append(new QStandardItem(encode));
+
+        // 保存完整路径到隐藏列
+        items.append(new QStandardItem(filename));
+
         ui_fileModel->appendRow(items);
     }
 }
@@ -245,9 +259,25 @@ void Widget::initFileTable()
     }
     ui_fileTable = new QTableView;
     ui_fileTable->setModel(ui_fileModel);
+
+    // 启用排序功能
+    ui_fileTable->setSortingEnabled(true);
+
     ui_fileTable->setItemDelegateForColumn(2, new ComboxDelegate());
     ui_fileTable->setItemDelegateForColumn(3, new ComboxDelegate());
-    // ui_fileTable->setH
+
+    // 设置表头右键菜单（仅针对"Out Encode"列，即第3列）
+    QHeaderView* headerView = ui_fileTable->horizontalHeader();
+    headerView->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(headerView, &QHeaderView::customContextMenuRequested, this, &Widget::onHeaderContextMenu);
+
+    // 设置数据行右键菜单
+    ui_fileTable->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(ui_fileTable, &QTableView::customContextMenuRequested, this, &Widget::onTableContextMenu);
+
+    // 隐藏完整路径列（第5列）
+    ui_fileTable->setColumnHidden(COL_FULLPATH, true);
+
     // 设置充满表宽度(现有列占据整个表格)
     ui_fileTable->horizontalHeader()->setStretchLastSection(true);
     ui_fileTable->setColumnWidth(0, this->width() - 256);
@@ -274,5 +304,153 @@ void Widget::scanFilesRecursively(QDir dir, const QStringList& extensions, QStri
                 fileList.append(entry.absoluteFilePath());
             }
         }
+    }
+}
+
+void Widget::onHeaderContextMenu(const QPoint& pos)
+{
+    QHeaderView* header = ui_fileTable->horizontalHeader();
+    int column = header->logicalIndexAt(pos);
+
+    // 只在"Out Encode"列（第3列）显示右键菜单
+    if (column == 3) {
+        QMenu menu(this);
+        QAction* action = menu.addAction(tr("统一设置输出编码"));
+        connect(action, &QAction::triggered, this, &Widget::onSetUniformOutEncode);
+        menu.exec(header->mapToGlobal(pos));
+    }
+}
+
+void Widget::onTableContextMenu(const QPoint& pos)
+{
+    QModelIndex index = ui_fileTable->indexAt(pos);
+    if (!index.isValid() || index.column() >= 2) {
+        return;
+    }
+
+    // 获取选中的行数
+    QModelIndexList selectedIndexes = ui_fileTable->selectionModel()->selectedIndexes();
+    QSet<int> selectedRows;
+    for(auto& index : selectedIndexes){
+        selectedRows.insert(index.row());
+    }
+    int selectedCount = selectedRows.size();
+
+    QMenu menu(this);
+
+    if (selectedCount == 1) {
+        // 单选：显示三个菜单项
+        QAction* openLocationAction = menu.addAction(tr("打开所在位置"));
+        QAction* openNotepadAction = menu.addAction(tr("使用记事本打开"));
+        QAction* removeAction = menu.addAction(tr("移除"));
+
+        connect(openLocationAction, &QAction::triggered, this, &Widget::onOpenFileLocation);
+        connect(openNotepadAction, &QAction::triggered, this, &Widget::onOpenWithNotepad);
+        connect(removeAction, &QAction::triggered, this, &Widget::onRemoveSelected);
+    }
+    else {
+        // 多选：仅显示移除
+        QAction* removeAction = menu.addAction(tr("移除"));
+        connect(removeAction, &QAction::triggered, this, &Widget::onRemoveSelected);
+    }
+
+    menu.exec(ui_fileTable->mapToGlobal(pos));
+}
+
+void Widget::onSetUniformOutEncode()
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("统一设置输出编码"));
+    dialog.setMinimumSize(300, 150);
+
+    QVBoxLayout* layout = new QVBoxLayout(&dialog);
+
+    QLabel* label = new QLabel(tr("请选择输出编码："), &dialog);
+    QComboBox* comboBox = new QComboBox(&dialog);
+
+    // 添加常用编码
+    QStringList encodings = {"UTF-8", "GBK", "GB18030", "GB2312", "Big5", "ISO-8859-1", "Shift_JIS"};
+    comboBox->addItems(encodings);
+
+    QHBoxLayout* btnLayout = new QHBoxLayout;
+    QPushButton* okBtn = new QPushButton(tr("确定"), &dialog);
+    QPushButton* cancelBtn = new QPushButton(tr("取消"), &dialog);
+
+    btnLayout->addStretch();
+    btnLayout->addWidget(okBtn);
+    btnLayout->addWidget(cancelBtn);
+
+    layout->addWidget(label);
+    layout->addWidget(comboBox);
+    layout->addLayout(btnLayout);
+
+    connect(okBtn, &QPushButton::clicked, &dialog, &QDialog::accept);
+    connect(cancelBtn, &QPushButton::clicked, &dialog, &QDialog::reject);
+
+    if (dialog.exec() == QDialog::Accepted) {
+        QString selectedEncoding = comboBox->currentText();
+
+        // 更新所有行的"Out Encode"列
+        for (int row = 0; row < ui_fileModel->rowCount(); ++row) {
+            QStandardItem* item = ui_fileModel->item(row, 3);
+            if (item) {
+                item->setText(selectedEncoding);
+            }
+        }
+    }
+}
+
+void Widget::onOpenFileLocation()
+{
+    QModelIndexList selectedIndexes = ui_fileTable->selectionModel()->selectedRows();
+    if (selectedIndexes.isEmpty()) {
+        return;
+    }
+
+    QModelIndex index = selectedIndexes.first();
+    QStandardItem* fullPathItem = ui_fileModel->item(index.row(), COL_FULLPATH);
+    if (!fullPathItem) {
+        return;
+    }
+
+    QString filePath = fullPathItem->text();
+    QFileInfo fileInfo(filePath);
+    QString absolutePath = fileInfo.absolutePath();
+
+    // 使用系统文件管理器打开文件所在位置
+    QUrl url = QUrl::fromLocalFile(absolutePath);
+    QDesktopServices::openUrl(url);
+}
+
+void Widget::onOpenWithNotepad()
+{
+    QModelIndexList selectedIndexes = ui_fileTable->selectionModel()->selectedRows();
+    if (selectedIndexes.isEmpty()) {
+        return;
+    }
+
+    QModelIndex index = selectedIndexes.first();
+    QStandardItem* fullPathItem = ui_fileModel->item(index.row(), COL_FULLPATH);
+    if (!fullPathItem) {
+        return;
+    }
+
+    QString filePath = fullPathItem->text();
+
+    // 使用记事本打开文件
+    QProcess::startDetached("notepad.exe", QStringList() << filePath);
+}
+
+void Widget::onRemoveSelected()
+{
+    QModelIndexList selectedIndexes = ui_fileTable->selectionModel()->selectedIndexes();
+
+    // 从后往前删除，避免索引变化
+    QSet<int> rows;
+    for (const QModelIndex& index : selectedIndexes) {
+        rows.insert(index.row());
+    }
+    for (auto it = rows.rbegin(); it != rows.rend(); it++) {
+        ui_fileModel->removeRow(*it);
     }
 }
