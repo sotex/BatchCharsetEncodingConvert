@@ -16,6 +16,9 @@ INCLUDEPATH += $$PWD/universalchardet/src/base/
 
 SOURCES += code/main.cpp\
         code/Widget.cpp \
+    code/FileScanWorker.cpp \
+    code/EncodingDetectWorker.cpp \
+    code/FileConvertWorker.cpp \
     universalchardet/src/base/CharDistribution.cpp \
     universalchardet/src/base/JpCntx.cpp \
     universalchardet/src/base/nsCharSetProber.cpp \
@@ -46,7 +49,11 @@ SOURCES += code/main.cpp\
 
 HEADERS  += \
     code/Widget.hpp \
-    universalchardet/src/base/nsUTF8Prober.h \
+    code/FileScanWorker.hpp \
+    code/EncodingDetectWorker.hpp \
+    code/FileConvertWorker.hpp \
+    code/CharsetDetector.hpp \
+    code/ComboxDelegate.hpp \
     universalchardet/src/base/CharDistribution.h \
     universalchardet/src/base/JpCntx.h \
     universalchardet/src/base/nsCharSetProber.h \
@@ -66,9 +73,7 @@ HEADERS  += \
     universalchardet/src/base/nsHebrewProber.h \
     universalchardet/src/base/nsSBCharSetProber.h \
     universalchardet/src/base/nsSBCSGroupProber.h \
-    universalchardet/src/base/prmem.h \
-    code/CharsetDetector.hpp \
-    code/ComboxDelegate.hpp
+    universalchardet/src/base/prmem.h
 
 DISTFILES += \
     universalchardet/src/base/Big5Freq.tab \

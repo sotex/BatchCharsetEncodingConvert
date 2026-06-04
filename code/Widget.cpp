@@ -1,6 +1,9 @@
 #include "Widget.hpp"
 #include "CharsetDetector.hpp"
 #include "ComboxDelegate.hpp"
+#include "FileScanWorker.hpp"
+#include "EncodingDetectWorker.hpp"
+#include "FileConvertWorker.hpp"
 
 #include <QHeaderView>
 #include <QStandardItemModel>
@@ -41,8 +44,20 @@ Widget::Widget(QWidget* parent)
     , ui_fileModel(nullptr)
     , m_contextMenu(nullptr)
     , m_applyToAllUnknown(false)
+    , m_threadPool(nullptr)
+    , m_cancelFlag(0)
+    , m_progressDialog(nullptr)
+    , m_totalFilesToProcess(0)
+    , m_processedFiles(0)
+    , m_conversionSuccessCount(0)
+    , m_conversionFailCount(0)
 {
     this->setWindowTitle(tr("Batch Charset Encoding Convert"));
+
+    // 初始化线程池
+    m_threadPool = new QThreadPool(this);
+    m_threadPool->setMaxThreadCount(QThread::idealThreadCount());
+
     // 初始化文件表
     initFileTable();
 
@@ -192,119 +207,14 @@ void Widget::dirSelectSlot()
 
     qDebug() << selectedExtensions;
 
-    // 递归扫描文件夹中的文件
-    QStringList fullPaths;
-    QDir dir(dirPath);
-    scanFilesRecursively(dir, selectedExtensions, fullPaths);
-
-    if (fullPaths.isEmpty()) {
-        QMessageBox::information(this, tr("Info"), tr("No files found matching the selected types."));
-        return;
-    }
-
-    // 添加到文件模型
-    addToFileModel(fullPaths);
+    // 启动后台文件扫描任务
+    startFileScanning(dirPath, selectedExtensions);
 }
 
 void Widget::convertToSlot()
 {
-    // 重置全局设置
-    m_unknownEncoding.clear();
-    m_applyToAllUnknown = false;
-
-    // 统计需要转换的文件
-    QList<QPair<int, QString>> filesToConvert;  // <行号, 文件路径>
-    int totalFiles = 0;
-
-    for (int row = 0; row < ui_fileModel->rowCount(); ++row) {
-        QString fromEncoding = ui_fileModel->item(row, 2)->text();
-        QString toEncoding = ui_fileModel->item(row, 3)->text();
-        QString filePath = ui_fileModel->item(row, COL_FULLPATH)->text();
-
-        // 跳过输入输出编码一致的文件
-        if (fromEncoding == toEncoding) {
-            continue;
-        }
-
-        filesToConvert.append(qMakePair(row, filePath));
-        totalFiles++;
-    }
-
-    if (totalFiles == 0) {
-        QMessageBox::information(this, tr("Info"), tr("No files need to be converted."));
-        return;
-    }
-
-    // 询问是否备份
-    QMessageBox::StandardButton reply;
-    reply = QMessageBox::question(this, tr("Backup"),
-                                 tr("Found %1 file(s) to convert.\nDo you want to create backup files (.bak) before conversion?")
-                                 .arg(totalFiles),
-                                 QMessageBox::Yes | QMessageBox::No);
-
-    bool needBackup = (reply == QMessageBox::Yes);
-
-    // 开始转换
-    int successCount = 0;
-    int skipCount = 0;
-    int failCount = 0;
-
-    for (const auto& filePair : filesToConvert) {
-        int row = filePair.first;
-        QString filePath = filePair.second;
-        QString fromEncoding = ui_fileModel->item(row, 2)->text();
-        QString toEncoding = ui_fileModel->item(row, 3)->text();
-
-        // 处理未知编码
-        if (fromEncoding == "Unknown" || fromEncoding.isEmpty()) {
-            if (m_applyToAllUnknown && !m_unknownEncoding.isEmpty()) {
-                fromEncoding = m_unknownEncoding;
-            }
-            else {
-                bool applyToAll = false;
-                QString selectedEncoding = selectUnknownEncodingDialog(QFileInfo(filePath).fileName(), applyToAll);
-                if (selectedEncoding.isEmpty()) {
-                    // 用户取消了该文件
-                    skipCount++;
-                    continue;
-                }
-
-                fromEncoding = selectedEncoding;
-
-                if (applyToAll) {
-                    m_unknownEncoding = selectedEncoding;
-                    m_applyToAllUnknown = true;
-                }
-            }
-        }
-
-        // 备份文件
-        if (needBackup) {
-            if (!backupFile(filePath)) {
-                qDebug() << "Backup failed for file: " << filePath;
-                failCount++;
-                continue;
-            }
-        }
-
-        // 转换文件
-        if (convertFile(filePath, fromEncoding, toEncoding, needBackup)) {
-            // 更新表格中的编码
-            ui_fileModel->item(row, 2)->setText(toEncoding);
-            successCount++;
-        }
-        else {
-            failCount++;
-        }
-    }
-
-    // 显示结果
-    QString message = tr("Conversion completed:\n");
-    message += tr("Success: %1 file(s)\n").arg(successCount);
-    message += tr("Skipped: %1 file(s)\n").arg(skipCount);
-    message += tr("Failed: %1 file(s)").arg(failCount);
-
-    QMessageBox::information(this, tr("Conversion Result"), message);
+    // 启动后台文件转换任务
+    startFileConversion();
 }
 
 void Widget::addToFileModel(QStringList filenames)
@@ -624,4 +534,278 @@ bool Widget::convertFile(const QString& filePath, const QString& fromEncoding, c
     file.close();
 
     return true;
+}
+
+// ==================== 文件扫描相关的槽 ====================
+
+void Widget::onFileScanProgress(int currentCount, const QString& currentFile)
+{
+    if (m_progressDialog) {
+        updateProgressDialog(currentCount, 0, tr("Scanning: %1").arg(currentFile));
+    }
+}
+
+void Widget::onFileScanCompleted(const QStringList& files)
+{
+    if (files.isEmpty()) {
+        hideProgressDialog();
+
+        if (m_cancelFlag.load() != 0) {
+            QMessageBox::information(this, tr("Info"), tr("File scanning was cancelled."));
+        }
+        else {
+            QMessageBox::information(this, tr("Info"), tr("No files found matching the selected types."));
+        }
+        return;
+    }
+
+    // 重置进度对话框
+    hideProgressDialog();
+    resetProgressDialog();
+
+    // 开始编码检测
+    startEncodingDetection(files);
+}
+
+void Widget::onFileScanError(const QString& error)
+{
+    hideProgressDialog();
+    QMessageBox::critical(this, tr("Error"), error);
+}
+
+// ==================== 编码检测相关的槽 ====================
+
+void Widget::onEncodingDetected(const FileEncodingResult& result)
+{
+    // 更新表格模型
+    QList<QStandardItem*> items;
+    items.append(new QStandardItem(QFileInfo(result.filePath).fileName()));
+
+    QString sfilesize;
+    if (result.fileSize < 1024) {
+        sfilesize.setNum(result.fileSize).append(" B");
+    }
+    else if (result.fileSize < 1024 * 1024) {
+        sfilesize.setNum(result.fileSize / 1024).append(" K");
+    }
+    else if (result.fileSize < 1024 * 1024 * 1024) {
+        sfilesize.setNum(result.fileSize / 1024 / 1024).append(" M");
+    }
+    else if (result.fileSize < 1024 * 1024 * 1024 * 1024) {
+        sfilesize.setNum(result.fileSize / 1024 / 1024 / 1024).append(" G");
+    }
+    items.append(new QStandardItem(sfilesize));
+    items[1]->setTextAlignment(Qt::AlignRight);
+
+    items.append(new QStandardItem(result.encoding));
+    items.append(new QStandardItem(result.encoding));
+    items.append(new QStandardItem(result.filePath));
+
+    ui_fileModel->appendRow(items);
+
+    // 更新进度
+    m_processedFiles++;
+    if (m_progressDialog) {
+        updateProgressDialog(m_processedFiles, m_totalFilesToProcess, tr("Detecting: %1").arg(QFileInfo(result.filePath).fileName()));
+    }
+
+    // 检查是否完成
+    if (m_processedFiles >= m_totalFilesToProcess) {
+        hideProgressDialog();
+        m_cancelFlag.store(0);
+    }
+}
+
+void Widget::onEncodingDetectError(const QString& filePath, const QString& error)
+{
+    qDebug() << "Encoding detection error for file:" << filePath << error;
+
+    // 继续处理下一个文件
+    m_processedFiles++;
+    if (m_processedFiles >= m_totalFilesToProcess) {
+        hideProgressDialog();
+        m_cancelFlag.store(0);
+    }
+}
+
+// ==================== 文件转换相关的槽 ====================
+
+void Widget::onFileConvertProgress(int successCount, int failCount, const QString& currentFile)
+{
+    m_conversionSuccessCount += successCount;
+    m_conversionFailCount += failCount;
+
+    if (m_progressDialog) {
+        updateProgressDialog(m_conversionSuccessCount + m_conversionFailCount, m_totalFilesToProcess, tr("Converting: %1").arg(currentFile));
+    }
+}
+
+void Widget::onFileConvertCompleted(int successCount, int failCount)
+{
+    hideProgressDialog();
+
+    QString message = tr("Conversion completed:\n");
+    message += tr("Success: %1 file(s)\n").arg(m_conversionSuccessCount);
+    message += tr("Failed: %1 file(s)").arg(m_conversionFailCount);
+
+    QMessageBox::information(this, tr("Conversion Result"), message);
+    m_cancelFlag.store(0);
+}
+
+void Widget::onFileConvertError(const QString& filePath, const QString& error)
+{
+    qDebug() << "File conversion error for file:" << filePath << error;
+}
+
+// ==================== 进度对话框相关方法 ====================
+
+void Widget::onProgressDialogCanceled()
+{
+    m_cancelFlag.store(1);
+}
+
+void Widget::showProgressDialog(const QString& title)
+{
+    if (!m_progressDialog) {
+        m_progressDialog = new QProgressDialog(this);
+        m_progressDialog->setWindowModality(Qt::WindowModal);
+        m_progressDialog->setCancelButtonText(tr("Cancel"));
+        m_progressDialog->setMinimumDuration(0);
+        m_progressDialog->setRange(0, 0);
+        connect(m_progressDialog, &QProgressDialog::canceled, this, &Widget::onProgressDialogCanceled);
+    }
+
+    m_progressDialog->setWindowTitle(title);
+    m_progressDialog->show();
+}
+
+void Widget::hideProgressDialog()
+{
+    if (m_progressDialog) {
+        m_progressDialog->hide();
+    }
+}
+
+void Widget::updateProgressDialog(int value, int maximum, const QString& status)
+{
+    if (m_progressDialog) {
+        m_progressDialog->setRange(0, maximum);
+        m_progressDialog->setValue(value);
+        m_progressDialog->setLabelText(status);
+    }
+}
+
+void Widget::resetProgressDialog()
+{
+    m_processedFiles = 0;
+    m_conversionSuccessCount = 0;
+    m_conversionFailCount = 0;
+    m_cancelFlag.store(0);
+}
+
+// ==================== 多线程任务方法 ====================
+
+void Widget::startFileScanning(const QString& dirPath, const QStringList& extensions)
+{
+    resetProgressDialog();
+    showProgressDialog(tr("Scanning Files"));
+
+    FileScanWorker* worker = new FileScanWorker(dirPath, extensions, &m_cancelFlag);
+    connect(worker, &FileScanWorker::progressUpdated, this, &Widget::onFileScanProgress);
+    connect(worker, &FileScanWorker::scanCompleted, this, &Widget::onFileScanCompleted);
+    connect(worker, &FileScanWorker::scanError, this, &Widget::onFileScanError);
+
+    m_threadPool->start(worker);
+}
+
+void Widget::startEncodingDetection(const QStringList& files)
+{
+    if (files.isEmpty()) {
+        return;
+    }
+
+    resetProgressDialog();
+    m_totalFilesToProcess = files.size();
+    m_processedFiles = 0;
+    showProgressDialog(tr("Detecting Encodings"));
+    updateProgressDialog(0, m_totalFilesToProcess, tr("Starting detection..."));
+
+    // 启动多个EncodingDetectWorker并行处理
+    for (const QString& filePath : files) {
+        EncodingDetectWorker* worker = new EncodingDetectWorker(filePath);
+        connect(worker, &EncodingDetectWorker::resultReady, this, &Widget::onEncodingDetected);
+        connect(worker, &EncodingDetectWorker::errorOccurred, this, &Widget::onEncodingDetectError);
+        m_threadPool->start(worker);
+    }
+}
+
+void Widget::startFileConversion()
+{
+    // 统计需要转换的文件
+    QList<QPair<int, QString>> filesToConvert;
+    int totalFiles = 0;
+
+    for (int row = 0; row < ui_fileModel->rowCount(); ++row) {
+        QString fromEncoding = ui_fileModel->item(row, 2)->text();
+        QString toEncoding = ui_fileModel->item(row, 3)->text();
+        QString filePath = ui_fileModel->item(row, COL_FULLPATH)->text();
+
+        if (fromEncoding == toEncoding) {
+            continue;
+        }
+
+        filesToConvert.append(qMakePair(row, filePath));
+        totalFiles++;
+    }
+
+    if (totalFiles == 0) {
+        QMessageBox::information(this, tr("Info"), tr("No files need to be converted."));
+        return;
+    }
+
+    // 询问是否备份
+    QMessageBox::StandardButton reply;
+    reply = QMessageBox::question(this, tr("Backup"),
+                                 tr("Found %1 file(s) to convert.\nDo you want to create backup files (.bak) before conversion?")
+                                 .arg(totalFiles),
+                                 QMessageBox::Yes | QMessageBox::No);
+
+    bool needBackup = (reply == QMessageBox::Yes);
+
+    // 重置进度并开始转换
+    resetProgressDialog();
+    m_totalFilesToProcess = totalFiles;
+    m_conversionSuccessCount = 0;
+    m_conversionFailCount = 0;
+    showProgressDialog(tr("Converting Files"));
+    updateProgressDialog(0, m_totalFilesToProcess, tr("Starting conversion..."));
+
+    // 启动多个FileConvertWorker并行处理
+    for (const auto& filePair : filesToConvert) {
+        int row = filePair.first;
+        QString filePath = filePair.second;
+        QString fromEncoding = ui_fileModel->item(row, 2)->text();
+        QString toEncoding = ui_fileModel->item(row, 3)->text();
+
+        // 处理未知编码 - 由于这是并行处理，需要特殊处理
+        if (fromEncoding == "unknow" || fromEncoding.isEmpty()) {
+            // 未知编码在并行模式下暂时跳过
+            qDebug() << "Skipping file with unknown encoding:" << filePath;
+            m_conversionFailCount++;
+            continue;
+        }
+
+        FileConvertWorker* worker = new FileConvertWorker(filePath, fromEncoding, toEncoding, needBackup, &m_cancelFlag);
+        connect(worker, &FileConvertWorker::progressUpdated, this, &Widget::onFileConvertProgress);
+        connect(worker, &FileConvertWorker::conversionCompleted, this, &Widget::onFileConvertCompleted);
+        connect(worker, &FileConvertWorker::conversionError, this, &Widget::onFileConvertError);
+        m_threadPool->start(worker);
+    }
+
+    // 如果所有文件都被跳过（都是未知编码），显示结果
+    if (m_conversionFailCount > 0 && m_conversionFailCount == totalFiles) {
+        hideProgressDialog();
+        QMessageBox::information(this, tr("Info"), tr("All files have unknown encoding. Please select encoding manually."));
+        m_cancelFlag.store(0);
+    }
 }
