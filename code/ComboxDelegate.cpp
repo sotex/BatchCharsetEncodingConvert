@@ -6,6 +6,11 @@ QWidget *ComboxDelegate::createEditor(QWidget *parent,
                                       const QStyleOptionViewItem&,
                                       const QModelIndex&) const
 {
+    return createEncodeComboBox(parent, m_out_mode);
+}
+
+QComboBox *ComboxDelegate::createEncodeComboBox(QWidget *parent, bool out)
+{
 
     QComboBox* ui_encoding = new QComboBox(parent);
     // International (Unicode)
@@ -21,7 +26,7 @@ QWidget *ComboxDelegate::createEditor(QWidget *parent,
     ui_encoding->addItem("EUC-TW");
     ui_encoding->addItem("GB18030");
     ui_encoding->addItem("HZ-GB-2312");
-    if(m_out_mode){
+    if(out){
         return ui_encoding;
     }
     // English

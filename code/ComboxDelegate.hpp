@@ -1,7 +1,9 @@
 #ifndef COMBOXDELEGATE_HPP
 #define COMBOXDELEGATE_HPP
 
+#include <QComboBox>
 #include <QStyledItemDelegate>
+
 
 class ComboxDelegate:public QStyledItemDelegate{
     bool m_out_mode;
@@ -12,6 +14,8 @@ public:
     // 创建你编辑时候的控件
     // 返回一个组件。该组件会被作为用户编辑数据时所使用的编辑器，从模型中接受数据，返回用户修改的数据。
     QWidget* createEditor(QWidget *parent, const QStyleOptionViewItem &, const QModelIndex &) const;
+
+    static QComboBox* createEncodeComboBox(QWidget *parent, bool out = false);
 
     // 编辑的时候设置数据到上面创建的editor中。
     // 提供上述组件在显示时所需要的默认值。

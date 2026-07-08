@@ -34,6 +34,8 @@ private slots:
     void onHeaderContextMenu(const QPoint& pos);
     void onTableContextMenu(const QPoint& pos);
     void onSetUniformOutEncode();
+    void onSetSelectedEncode();
+    void onSetSelectedOutEncode();
     void onOpenFileLocation();
     void onOpenWithNotepad();
     void onRemoveSelected();

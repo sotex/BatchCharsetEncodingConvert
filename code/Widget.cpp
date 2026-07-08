@@ -26,6 +26,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QDialog>
+#include <QDialogButtonBox>
 #include <QListWidget>
 #include <QHBoxLayout>
 #include <QMessageBox>
@@ -338,37 +339,52 @@ void Widget::onHeaderContextMenu(const QPoint& pos)
 void Widget::onTableContextMenu(const QPoint& pos)
 {
     QModelIndex index = ui_fileTable->indexAt(pos);
-    if (!index.isValid() || index.column() >= 2) {
+    if (!index.isValid()) {
         return;
     }
 
-    // 获取选中的行数
     QModelIndexList selectedIndexes = ui_fileTable->selectionModel()->selectedIndexes();
     QSet<int> selectedRows;
+    QSet<int> selectedColumns;
     for(auto& index : selectedIndexes){
         selectedRows.insert(index.row());
+        selectedColumns.insert(index.column());
     }
     int selectedCount = selectedRows.size();
 
     QMenu menu(this);
 
-    if (selectedCount == 1) {
-        // 单选：显示三个菜单项
-        QAction* openLocationAction = menu.addAction(tr("打开所在位置"));
-        QAction* openNotepadAction = menu.addAction(tr("使用记事本打开"));
-        QAction* removeAction = menu.addAction(tr("移除"));
-
-        connect(openLocationAction, &QAction::triggered, this, &Widget::onOpenFileLocation);
-        connect(openNotepadAction, &QAction::triggered, this, &Widget::onOpenWithNotepad);
-        connect(removeAction, &QAction::triggered, this, &Widget::onRemoveSelected);
-    }
-    else {
-        // 多选：仅显示移除
-        QAction* removeAction = menu.addAction(tr("移除"));
-        connect(removeAction, &QAction::triggered, this, &Widget::onRemoveSelected);
+    if (selectedCount > 1 && selectedColumns.size() == 1) {
+        int selectedColumn = *selectedColumns.constBegin();
+        if (selectedColumn == 2) {
+            QAction* setEncodeAction = menu.addAction(tr("设置文件编码"));
+            connect(setEncodeAction, &QAction::triggered, this, &Widget::onSetSelectedEncode);
+        }
+        else if (selectedColumn == 3) {
+            QAction* setOutEncodeAction = menu.addAction(tr("设置输出编码"));
+            connect(setOutEncodeAction, &QAction::triggered, this, &Widget::onSetSelectedOutEncode);
+        }
     }
 
-    menu.exec(ui_fileTable->mapToGlobal(pos));
+    if (index.column() < 2) {
+        if (selectedCount == 1) {
+            QAction* openLocationAction = menu.addAction(tr("打开所在位置"));
+            QAction* openNotepadAction = menu.addAction(tr("使用记事本打开"));
+            QAction* removeAction = menu.addAction(tr("移除"));
+
+            connect(openLocationAction, &QAction::triggered, this, &Widget::onOpenFileLocation);
+            connect(openNotepadAction, &QAction::triggered, this, &Widget::onOpenWithNotepad);
+            connect(removeAction, &QAction::triggered, this, &Widget::onRemoveSelected);
+        }
+        else {
+            QAction* removeAction = menu.addAction(tr("移除"));
+            connect(removeAction, &QAction::triggered, this, &Widget::onRemoveSelected);
+        }
+    }
+
+    if (!menu.isEmpty()) {
+        menu.exec(ui_fileTable->mapToGlobal(pos));
+    }
 }
 
 void Widget::onSetUniformOutEncode()
@@ -410,6 +426,72 @@ void Widget::onSetUniformOutEncode()
             QStandardItem* item = ui_fileModel->item(row, 3);
             if (item) {
                 item->setText(selectedEncoding);
+            }
+        }
+    }
+}
+
+void Widget::onSetSelectedEncode()
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("设置文件编码"));
+    dialog.setMinimumSize(300, 150);
+
+    QVBoxLayout* layout = new QVBoxLayout(&dialog);
+
+    QLabel* label = new QLabel(tr("请选择文件编码："), &dialog);
+    QComboBox* comboBox = ComboxDelegate::createEncodeComboBox(&dialog);
+    QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+
+    layout->addWidget(label);
+    layout->addWidget(comboBox);
+    layout->addWidget(buttonBox);
+
+    connect(buttonBox, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttonBox, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+    if (dialog.exec() == QDialog::Accepted) {
+        QString selectedEncoding = comboBox->currentText();
+        QModelIndexList selectedIndexes = ui_fileTable->selectionModel()->selectedIndexes();
+        for (const QModelIndex& index : selectedIndexes) {
+            if (index.column() == 2) {
+                QStandardItem* item = ui_fileModel->item(index.row(), 2);
+                if (item) {
+                    item->setText(selectedEncoding);
+                }
+            }
+        }
+    }
+}
+
+void Widget::onSetSelectedOutEncode()
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("设置输出编码"));
+    dialog.setMinimumSize(300, 150);
+
+    QVBoxLayout* layout = new QVBoxLayout(&dialog);
+
+    QLabel* label = new QLabel(tr("请选择输出编码："), &dialog);
+    QComboBox* comboBox = ComboxDelegate::createEncodeComboBox(&dialog, true);
+    QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+
+    layout->addWidget(label);
+    layout->addWidget(comboBox);
+    layout->addWidget(buttonBox);
+
+    connect(buttonBox, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttonBox, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+
+    if (dialog.exec() == QDialog::Accepted) {
+        QString selectedEncoding = comboBox->currentText();
+        QModelIndexList selectedIndexes = ui_fileTable->selectionModel()->selectedIndexes();
+        for (const QModelIndex& index : selectedIndexes) {
+            if (index.column() == 3) {
+                QStandardItem* item = ui_fileModel->item(index.row(), 3);
+                if (item) {
+                    item->setText(selectedEncoding);
+                }
             }
         }
     }
