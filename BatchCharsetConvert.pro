@@ -11,6 +11,9 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 TARGET = BatchCharsetConvert
 TEMPLATE = app
 
+# Application icon (Windows)
+win32:RC_FILE = app.rc
+
 INCLUDEPATH += $$PWD/universalchardet
 
 
