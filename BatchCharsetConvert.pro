@@ -112,4 +112,11 @@ HEADERS += \
 # Translations
 TRANSLATIONS = translations/zh_CN.ts
 
+# Generate .qm from .ts automatically
+translations.commands = lrelease ${QMAKE_FILE_IN} -qm ${QMAKE_FILE_OUT}
+translations.input = TRANSLATIONS
+translations.output = translations/${QMAKE_FILE_BASE}.qm
+translations.CONFIG = no_link
+QMAKE_EXTRA_COMPILERS += translations
+
 RESOURCES = translations.qrc
