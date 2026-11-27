@@ -11,73 +11,98 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 TARGET = BatchCharsetConvert
 TEMPLATE = app
 
-INCLUDEPATH += $$PWD/universalchardet/src/base/
+INCLUDEPATH += $$PWD/universalchardet
 
 
-SOURCES += code/main.cpp\
-        code/Widget.cpp \
+# --- universalchardet sources ---
+UCHARDET_SOURCES = \
+    $$PWD/universalchardet/uchardet.cpp \
+    $$PWD/universalchardet/nsUniversalDetector.cpp \
+    $$PWD/universalchardet/nsCharSetProber.cpp \
+    $$PWD/universalchardet/nsSBCharSetProber.cpp \
+    $$PWD/universalchardet/nsSBCSGroupProber.cpp \
+    $$PWD/universalchardet/nsMBCSGroupProber.cpp \
+    $$PWD/universalchardet/nsEscCharsetProber.cpp \
+    $$PWD/universalchardet/nsEscSM.cpp \
+    $$PWD/universalchardet/nsMBCSSM.cpp \
+    $$PWD/universalchardet/nsBig5Prober.cpp \
+    $$PWD/universalchardet/nsEUCJPProber.cpp \
+    $$PWD/universalchardet/nsEUCKRProber.cpp \
+    $$PWD/universalchardet/nsEUCTWProber.cpp \
+    $$PWD/universalchardet/nsGB2312Prober.cpp \
+    $$PWD/universalchardet/nsSJISProber.cpp \
+    $$PWD/universalchardet/nsUTF8Prober.cpp \
+    $$PWD/universalchardet/nsLatin1Prober.cpp \
+    $$PWD/universalchardet/nsHebrewProber.cpp \
+    $$PWD/universalchardet/CharDistribution.cpp \
+    $$PWD/universalchardet/JpCntx.cpp \
+    $$PWD/universalchardet/LangModels/LangArabicModel.cpp \
+    $$PWD/universalchardet/LangModels/LangBulgarianModel.cpp \
+    $$PWD/universalchardet/LangModels/LangCroatianModel.cpp \
+    $$PWD/universalchardet/LangModels/LangCzechModel.cpp \
+    $$PWD/universalchardet/LangModels/LangDanishModel.cpp \
+    $$PWD/universalchardet/LangModels/LangEsperantoModel.cpp \
+    $$PWD/universalchardet/LangModels/LangEstonianModel.cpp \
+    $$PWD/universalchardet/LangModels/LangFinnishModel.cpp \
+    $$PWD/universalchardet/LangModels/LangFrenchModel.cpp \
+    $$PWD/universalchardet/LangModels/LangGermanModel.cpp \
+    $$PWD/universalchardet/LangModels/LangGreekModel.cpp \
+    $$PWD/universalchardet/LangModels/LangHebrewModel.cpp \
+    $$PWD/universalchardet/LangModels/LangHungarianModel.cpp \
+    $$PWD/universalchardet/LangModels/LangIrishModel.cpp \
+    $$PWD/universalchardet/LangModels/LangItalianModel.cpp \
+    $$PWD/universalchardet/LangModels/LangLatvianModel.cpp \
+    $$PWD/universalchardet/LangModels/LangLithuanianModel.cpp \
+    $$PWD/universalchardet/LangModels/LangMalteseModel.cpp \
+    $$PWD/universalchardet/LangModels/LangNorwegianModel.cpp \
+    $$PWD/universalchardet/LangModels/LangPolishModel.cpp \
+    $$PWD/universalchardet/LangModels/LangPortugueseModel.cpp \
+    $$PWD/universalchardet/LangModels/LangRomanianModel.cpp \
+    $$PWD/universalchardet/LangModels/LangRussianModel.cpp \
+    $$PWD/universalchardet/LangModels/LangSlovakModel.cpp \
+    $$PWD/universalchardet/LangModels/LangSloveneModel.cpp \
+    $$PWD/universalchardet/LangModels/LangSpanishModel.cpp \
+    $$PWD/universalchardet/LangModels/LangSwedishModel.cpp \
+    $$PWD/universalchardet/LangModels/LangThaiModel.cpp \
+    $$PWD/universalchardet/LangModels/LangTurkishModel.cpp \
+    $$PWD/universalchardet/LangModels/LangVietnameseModel.cpp
+
+SOURCES += code/main.cpp \
+    code/Widget.cpp \
     code/FileScanWorker.cpp \
     code/EncodingDetectWorker.cpp \
     code/FileConvertWorker.cpp \
-    universalchardet/src/base/CharDistribution.cpp \
-    universalchardet/src/base/JpCntx.cpp \
-    universalchardet/src/base/nsCharSetProber.cpp \
-    universalchardet/src/base/nsEscCharsetProber.cpp \
-    universalchardet/src/base/nsEscSM.cpp \
-    universalchardet/src/base/nsEUCJPProber.cpp \
-    universalchardet/src/base/nsLatin1Prober.cpp \
-    universalchardet/src/base/nsMBCSGroupProber.cpp \
-    universalchardet/src/base/nsMBCSSM.cpp \
-    universalchardet/src/base/nsSJISProber.cpp \
-    universalchardet/src/base/nsUniversalDetector.cpp \
-    universalchardet/src/base/nsUTF8Prober.cpp \
-    universalchardet/src/base/LangBulgarianModel.cpp \
-    universalchardet/src/base/LangCyrillicModel.cpp \
-    universalchardet/src/base/LangGreekModel.cpp \
-    universalchardet/src/base/LangHebrewModel.cpp \
-    universalchardet/src/base/LangHungarianModel.cpp \
-    universalchardet/src/base/LangThaiModel.cpp \
-    universalchardet/src/base/nsBig5Prober.cpp \
-    universalchardet/src/base/nsEUCKRProber.cpp \
-    universalchardet/src/base/nsEUCTWProber.cpp \
-    universalchardet/src/base/nsGB2312Prober.cpp \
-    universalchardet/src/base/nsHebrewProber.cpp \
-    universalchardet/src/base/nsSBCharSetProber.cpp \
-    universalchardet/src/base/nsSBCSGroupProber.cpp \
     code/CharsetDetector.cpp \
-    code/ComboxDelegate.cpp
+    code/ComboxDelegate.cpp \
+    $$UCHARDET_SOURCES
 
-HEADERS  += \
+HEADERS += \
     code/Widget.hpp \
     code/FileScanWorker.hpp \
     code/EncodingDetectWorker.hpp \
     code/FileConvertWorker.hpp \
     code/CharsetDetector.hpp \
     code/ComboxDelegate.hpp \
-    universalchardet/src/base/CharDistribution.h \
-    universalchardet/src/base/JpCntx.h \
-    universalchardet/src/base/nsCharSetProber.h \
-    universalchardet/src/base/nsCodingStateMachine.h \
-    universalchardet/src/base/nsEscCharsetProber.h \
-    universalchardet/src/base/nsEUCJPProber.h \
-    universalchardet/src/base/nsLatin1Prober.h \
-    universalchardet/src/base/nsMBCSGroupProber.h \
-    universalchardet/src/base/nsPkgInt.h \
-    universalchardet/src/base/nsSJISProber.h \
-    universalchardet/src/base/nsUniversalDetector.h \
-    universalchardet/src/base/nsBig5Prober.h \
-    universalchardet/src/base/nscore.h \
-    universalchardet/src/base/nsEUCKRProber.h \
-    universalchardet/src/base/nsEUCTWProber.h \
-    universalchardet/src/base/nsGB2312Prober.h \
-    universalchardet/src/base/nsHebrewProber.h \
-    universalchardet/src/base/nsSBCharSetProber.h \
-    universalchardet/src/base/nsSBCSGroupProber.h \
-    universalchardet/src/base/prmem.h
+    $$PWD/universalchardet/uchardet.h \
+    $$PWD/universalchardet/nsUniversalDetector.h \
+    $$PWD/universalchardet/nsCharSetProber.h \
+    $$PWD/universalchardet/nsSBCharSetProber.h \
+    $$PWD/universalchardet/nsSBCSGroupProber.h \
+    $$PWD/universalchardet/nsMBCSGroupProber.h \
+    $$PWD/universalchardet/nsEscCharsetProber.h \
+    $$PWD/universalchardet/nsBig5Prober.h \
+    $$PWD/universalchardet/nsEUCJPProber.h \
+    $$PWD/universalchardet/nsEUCKRProber.h \
+    $$PWD/universalchardet/nsEUCTWProber.h \
+    $$PWD/universalchardet/nsGB2312Prober.h \
+    $$PWD/universalchardet/nsSJISProber.h \
+    $$PWD/universalchardet/nsUTF8Prober.h \
+    $$PWD/universalchardet/nsLatin1Prober.h \
+    $$PWD/universalchardet/nsHebrewProber.h \
+    $$PWD/universalchardet/nsCodingStateMachine.h \
+    $$PWD/universalchardet/nscore.h \
+    $$PWD/universalchardet/nsPkgInt.h \
+    $$PWD/universalchardet/prmem.h \
+    $$PWD/universalchardet/CharDistribution.h \
+    $$PWD/universalchardet/JpCntx.h
 
-DISTFILES += \
-    universalchardet/src/base/Big5Freq.tab \
-    universalchardet/src/base/EUCKRFreq.tab \
-    universalchardet/src/base/EUCTWFreq.tab \
-    universalchardet/src/base/GB2312Freq.tab \
-    universalchardet/src/base/JISFreq.tab
