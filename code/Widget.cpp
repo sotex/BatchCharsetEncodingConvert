@@ -55,7 +55,7 @@ Widget::Widget(QWidget* parent)
     , m_conversionSuccessCount(0)
     , m_conversionFailCount(0)
 {
-    this->setWindowTitle(tr("Batch Charset Encoding Convert"));
+    this->setWindowTitle(tr("Batch Charset Encoding Conversion" /* "批量字符集编码转换" */));
 
     // 注册FileEncodingResult到元类型系统
     qRegisterMetaType<FileEncodingResult>("FileEncodingResult");
@@ -68,13 +68,13 @@ Widget::Widget(QWidget* parent)
     initFileTable();
 
     // 初始化按钮
-    ui_fileSelect = new QPushButton("选择文件...");
+    ui_fileSelect = new QPushButton(tr("Select Files..." /* "选择文件..." */));
     connect(ui_fileSelect, &QPushButton::clicked, this, &Widget::fileSelectSlot);
-    ui_dirSelect = new QPushButton("选择文件夹...");
+    ui_dirSelect = new QPushButton(tr("Select Folder..." /* "选择文件夹..." */));
     connect(ui_dirSelect, &QPushButton::clicked, this, &Widget::dirSelectSlot);
-    ui_ConvertTo = new QPushButton("转换编码...");
+    ui_ConvertTo = new QPushButton(tr("Convert Encoding..." /* "转换编码..." */));
     connect(ui_ConvertTo, &QPushButton::clicked, this, &Widget::convertToSlot);
-    ui_Exit = new QPushButton("退出");
+    ui_Exit = new QPushButton(tr("Exit" /* "退出" */));
     connect(ui_Exit, &QPushButton::clicked, this, &Widget::close);
 
     QHBoxLayout* btnLayout = new QHBoxLayout();
@@ -110,42 +110,42 @@ void Widget::fileSelectSlot()
 void Widget::dirSelectSlot()
 {
     // 选择文件夹
-    QString dirPath = QFileDialog::getExistingDirectory(this, tr("Select Folder"));
+    QString dirPath = QFileDialog::getExistingDirectory(this, tr("Select Folder" /* "选择文件夹" */));
     if (dirPath.isEmpty()) {
         return;
     }
 
     // 定义常用文本文件类型（格式：显示名称, 扩展名列表）
     QVector<QPair<QString, QStringList>> fileTypes = {
-        {tr("C/C++ Source Code"), {"c", "cpp", "cc", "cxx", "h", "hpp", "hxx"}},
-        {tr("HTML Source Code"), {"html", "htm"}},
-        {tr("XML Files"), {"xml"}},
-        {tr("CSS Files"), {"css"}},
-        {tr("JavaScript"), {"js", "jsx"}},
-        {tr("JSON Files"), {"json"}},
-        {tr("Python"), {"py", "pyw"}},
-        {tr("Java"), {"java"}},
-        {tr("C# Source Code"), {"cs"}},
-        {tr("PHP"), {"php"}},
-        {tr("Ruby"), {"rb"}},
-        {tr("Go"), {"go"}},
-        {tr("Rust"), {"rs"}},
-        {tr("SQL Files"), {"sql"}},
-        {tr("Text Files"), {"txt", "log"}},
-        {tr("Markdown"), {"md", "markdown"}},
-        {tr("Configuration Files"), {"ini", "cfg", "conf", "properties"}},
-        {tr("Shell Scripts"), {"sh", "bash", "bat", "cmd"}},
-        {tr("YAML Files"), {"yaml", "yml"}},
-        {tr("Lua"), {"lua"}},
-        {tr("Perl"), {"pl", "pm"}},
-        {tr("Swift"), {"swift"}},
-        {tr("Kotlin"), {"kt", "kts"}},
-        {tr("All Source Files"), {"c", "cpp", "cc", "cxx", "h", "hpp", "hxx", "java", "py", "js", "go", "rs", "cs", "php", "rb", "swift", "kt"}}
+        {tr("C/C++ Source Code" /* "C/C++ 源代码" */), {"c", "cpp", "cc", "cxx", "h", "hpp", "hxx"}},
+        {tr("HTML Source Code" /* "HTML 源代码" */), {"html", "htm"}},
+        {tr("XML Files" /* "XML 文件" */), {"xml"}},
+        {tr("CSS Files" /* "CSS 文件" */), {"css"}},
+        {tr("JavaScript Files" /* "JavaScript 文件" */), {"js", "jsx"}},
+        {tr("JSON Files" /* "JSON 文件" */), {"json"}},
+        {tr("Python Files" /* "Python 文件" */), {"py", "pyw"}},
+        {tr("Java Files" /* "Java 文件" */), {"java"}},
+        {tr("C# Source Code" /* "C# 源代码" */), {"cs"}},
+        {tr("PHP Files" /* "PHP 文件" */), {"php"}},
+        {tr("Ruby Files" /* "Ruby 文件" */), {"rb"}},
+        {tr("Go Files" /* "Go 文件" */), {"go"}},
+        {tr("Rust Files" /* "Rust 文件" */), {"rs"}},
+        {tr("SQL Files" /* "SQL 文件" */), {"sql"}},
+        {tr("Text Files" /* "文本文件" */), {"txt", "log"}},
+        {tr("Markdown Files" /* "Markdown 文件" */), {"md", "markdown"}},
+        {tr("Configuration Files" /* "配置文件" */), {"ini", "cfg", "conf", "properties"}},
+        {tr("Shell Scripts" /* "Shell 脚本" */), {"sh", "bash", "bat", "cmd"}},
+        {tr("YAML Files" /* "YAML 文件" */), {"yaml", "yml"}},
+        {tr("Lua Files" /* "Lua 文件" */), {"lua"}},
+        {tr("Perl Files" /* "Perl 文件" */), {"pl", "pm"}},
+        {tr("Swift Files" /* "Swift 文件" */), {"swift"}},
+        {tr("Kotlin Files" /* "Kotlin 文件" */), {"kt", "kts"}},
+        {tr("All Source Files" /* "所有源代码文件" */), {"c", "cpp", "cc", "cxx", "h", "hpp", "hxx", "java", "py", "js", "go", "rs", "cs", "php", "rb", "swift", "kt"}}
     };
 
     // 创建文件类型选择对话框
     QDialog dialog(this);
-    dialog.setWindowTitle(tr("Select File Types"));
+    dialog.setWindowTitle(tr("Select File Types" /* "选择文件类型" */));
     dialog.setMinimumSize(400, 500);
 
     QVBoxLayout* mainLayout = new QVBoxLayout(&dialog);
@@ -162,10 +162,10 @@ void Widget::dirSelectSlot()
 
     // 全选/取消全选按钮
     QHBoxLayout* btnLayout = new QHBoxLayout;
-    QPushButton* selectAllBtn = new QPushButton(tr("Select All"), &dialog);
-    QPushButton* deselectAllBtn = new QPushButton(tr("Deselect All"), &dialog);
-    QPushButton* okBtn = new QPushButton(tr("OK"), &dialog);
-    QPushButton* cancelBtn = new QPushButton(tr("Cancel"), &dialog);
+    QPushButton* selectAllBtn = new QPushButton(tr("Select All" /* "全选" */), &dialog);
+    QPushButton* deselectAllBtn = new QPushButton(tr("Deselect All" /* "全不选" */), &dialog);
+    QPushButton* okBtn = new QPushButton(tr("OK" /* "确定" */), &dialog);
+    QPushButton* cancelBtn = new QPushButton(tr("Cancel" /* "取消" */), &dialog);
 
     btnLayout->addWidget(selectAllBtn);
     btnLayout->addWidget(deselectAllBtn);
@@ -207,7 +207,7 @@ void Widget::dirSelectSlot()
     }
 
     if (selectedExtensions.isEmpty()) {
-        QMessageBox::warning(this, tr("Warning"), tr("Please select at least one file type."));
+        QMessageBox::warning(this, tr("Warning" /* "警告" */), tr("Please select at least one file type." /* "请至少选择一种文件类型。" */));
         return;
     }
 
@@ -267,7 +267,7 @@ void Widget::addToFileModel(QStringList filenames)
 void Widget::initFileTable()
 {
     ui_fileModel            = new QStandardItemModel;
-    QStringList tableheader = {tr("File Name"), tr("Size"), tr("Encode"), tr("Out Encode"), tr("Path")};
+    QStringList tableheader = {tr("File Name" /* "文件名" */), tr("Size" /* "大小" */), tr("Encoding" /* "编码" */), tr("Output Encoding" /* "输出编码" */), tr("Path" /* "路径" */)};
     for (int i = 0; i < tableheader.size(); ++i) {
         QStandardItem* item = new QStandardItem(tableheader[i]);
         ui_fileModel->setHorizontalHeaderItem(i, item);
@@ -330,7 +330,7 @@ void Widget::onHeaderContextMenu(const QPoint& pos)
     // 只在"Out Encode"列（第3列）显示右键菜单
     if (column == 3) {
         QMenu menu(this);
-        QAction* action = menu.addAction(tr("统一设置输出编码"));
+        QAction* action = menu.addAction(tr("Set Uniform Output Encoding" /* "统一设置输出编码" */));
         connect(action, &QAction::triggered, this, &Widget::onSetUniformOutEncode);
         menu.exec(header->mapToGlobal(pos));
     }
@@ -357,27 +357,27 @@ void Widget::onTableContextMenu(const QPoint& pos)
     if (selectedCount > 1 && selectedColumns.size() == 1) {
         int selectedColumn = *selectedColumns.constBegin();
         if (selectedColumn == 2) {
-            QAction* setEncodeAction = menu.addAction(tr("设置文件编码"));
+            QAction* setEncodeAction = menu.addAction(tr("Set File Encoding" /* "设置文件编码" */));
             connect(setEncodeAction, &QAction::triggered, this, &Widget::onSetSelectedEncode);
         }
         else if (selectedColumn == 3) {
-            QAction* setOutEncodeAction = menu.addAction(tr("设置输出编码"));
+            QAction* setOutEncodeAction = menu.addAction(tr("Set Output Encoding" /* "设置输出编码" */));
             connect(setOutEncodeAction, &QAction::triggered, this, &Widget::onSetSelectedOutEncode);
         }
     }
 
     if (index.column() < 2) {
         if (selectedCount == 1) {
-            QAction* openLocationAction = menu.addAction(tr("打开所在位置"));
-            QAction* openNotepadAction = menu.addAction(tr("使用记事本打开"));
-            QAction* removeAction = menu.addAction(tr("移除"));
+            QAction* openLocationAction = menu.addAction(tr("Open Location" /* "打开所在位置" */));
+            QAction* openNotepadAction = menu.addAction(tr("Open with Notepad" /* "使用记事本打开" */));
+            QAction* removeAction = menu.addAction(tr("Remove" /* "移除" */));
 
             connect(openLocationAction, &QAction::triggered, this, &Widget::onOpenFileLocation);
             connect(openNotepadAction, &QAction::triggered, this, &Widget::onOpenWithNotepad);
             connect(removeAction, &QAction::triggered, this, &Widget::onRemoveSelected);
         }
         else {
-            QAction* removeAction = menu.addAction(tr("移除"));
+            QAction* removeAction = menu.addAction(tr("Remove" /* "移除" */));
             connect(removeAction, &QAction::triggered, this, &Widget::onRemoveSelected);
         }
     }
@@ -390,12 +390,12 @@ void Widget::onTableContextMenu(const QPoint& pos)
 void Widget::onSetUniformOutEncode()
 {
     QDialog dialog(this);
-    dialog.setWindowTitle(tr("统一设置输出编码"));
+    dialog.setWindowTitle(tr("Set Uniform Output Encoding" /* "统一设置输出编码" */));
     dialog.setMinimumSize(300, 150);
 
     QVBoxLayout* layout = new QVBoxLayout(&dialog);
 
-    QLabel* label = new QLabel(tr("请选择输出编码："), &dialog);
+    QLabel* label = new QLabel(tr("Please select output encoding:" /* "请选择输出编码：" */), &dialog);
     QComboBox* comboBox = new QComboBox(&dialog);
 
     // 添加常用编码
@@ -404,8 +404,8 @@ void Widget::onSetUniformOutEncode()
     comboBox->addItems(encodings);
 
     QHBoxLayout* btnLayout = new QHBoxLayout;
-    QPushButton* okBtn = new QPushButton(tr("确定"), &dialog);
-    QPushButton* cancelBtn = new QPushButton(tr("取消"), &dialog);
+    QPushButton* okBtn = new QPushButton(tr("OK" /* "确定" */), &dialog);
+    QPushButton* cancelBtn = new QPushButton(tr("Cancel" /* "取消" */), &dialog);
 
     btnLayout->addStretch();
     btnLayout->addWidget(okBtn);
@@ -434,12 +434,12 @@ void Widget::onSetUniformOutEncode()
 void Widget::onSetSelectedEncode()
 {
     QDialog dialog(this);
-    dialog.setWindowTitle(tr("设置文件编码"));
+    dialog.setWindowTitle(tr("Set File Encoding" /* "设置文件编码" */));
     dialog.setMinimumSize(300, 150);
 
     QVBoxLayout* layout = new QVBoxLayout(&dialog);
 
-    QLabel* label = new QLabel(tr("请选择文件编码："), &dialog);
+    QLabel* label = new QLabel(tr("Please select file encoding:" /* "请选择文件编码：" */), &dialog);
     QComboBox* comboBox = ComboxDelegate::createEncodeComboBox(&dialog);
     QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
 
@@ -467,12 +467,12 @@ void Widget::onSetSelectedEncode()
 void Widget::onSetSelectedOutEncode()
 {
     QDialog dialog(this);
-    dialog.setWindowTitle(tr("设置输出编码"));
+    dialog.setWindowTitle(tr("Set Output Encoding" /* "设置输出编码" */));
     dialog.setMinimumSize(300, 150);
 
     QVBoxLayout* layout = new QVBoxLayout(&dialog);
 
-    QLabel* label = new QLabel(tr("请选择输出编码："), &dialog);
+    QLabel* label = new QLabel(tr("Please select output encoding:" /* "请选择输出编码：" */), &dialog);
     QComboBox* comboBox = ComboxDelegate::createEncodeComboBox(&dialog, true);
     QDialogButtonBox* buttonBox = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
 

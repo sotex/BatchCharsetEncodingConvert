@@ -109,3 +109,7 @@ HEADERS += \
     $$PWD/universalchardet/CharDistribution.h \
     $$PWD/universalchardet/JpCntx.h
 
+# Translations
+TRANSLATIONS = translations/zh_CN.ts
+
+RESOURCES = translations.qrc
